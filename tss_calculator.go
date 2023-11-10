@@ -1,19 +1,20 @@
 package main;
 
 import (
+	"bufio"
+	"flag"
 	"fmt"
 	"math"
+	"os"
+	"strings"
 	"sort"
 	"atp_planner/parser"
 )
 
-//const typ = "bike";
-const typ = "run";
-//const test = "10m Z1, 6 * (30m Z4, 10m Z1), 10m Z1";
-const test = "20m Z1";
+var input = flag.String("input", "", "the file to read workouts from")
 
 const ftp = 352.0; // Watts
-var zones = map[string]parser.Zone{
+var zones = parser.ZoneMap{
 	"Z1": parser.Zone{45, 55},     // Active Recovery
 	"Z2": parser.Zone{55, 73},     // Endurance
 	"Z3": parser.Zone{73, 88},     // Tempo
@@ -24,7 +25,7 @@ var zones = map[string]parser.Zone{
 };
 
 const thresholdPace = 10; // mph
-var zonesRun = map[string]parser.Zone{
+var zonesRun = parser.ZoneMap{
 	"Z1": parser.Zone{60, 74},     // Active Recovery
 	"Z2": parser.Zone{73, 82},     // Endurance
 	"Z3": parser.Zone{83, 92},     // Tempo
@@ -34,25 +35,15 @@ var zonesRun = map[string]parser.Zone{
 	"Z5c": parser.Zone{111, 125},  // Neuromuscular
 };
 
-///////////////////////////////////////////////////////////////////////////////
-func main() {
-	mult := ftp
-	tz := zones;
-	if typ == "run" {
-		mult = thresholdPace;
-		tz = zonesRun;
-	}
-	// Parse
-	toks, err := parser.Tokenize(test);
+func analyzeWorkout(typ, name, input string, mult float64, zones parser.ZoneMap, sortedZoneNames []string) (string, error) {
+	toks, err := parser.Tokenize(input);
 	if err != nil {
-		fmt.Printf("Failed to tokenize: %v", err);
-		return;
+		return "", fmt.Errorf("Failed to tokenize: %v", err);
 	}
-	p := parser.New(toks, tz);
+	p := parser.New(toks, zones);
 	i, err := p.Parse();
 	if err != nil {
-		fmt.Printf("Failed to parse: %v", err);
-		return;
+		return "", fmt.Errorf("Failed to parse: %v", err);
 	}
 	// Compute statistics
 	w := i.Window1s();
@@ -72,7 +63,6 @@ func main() {
 			tsum += w30[i-j];
 		}
 		sum += math.Pow(tsum / 3.0, 4.0);
-		fmt.Printf("%v^4=%v\n", tsum / 3.0, math.Pow(tsum / 3.0, 4.0));
 		cnt += 1;
 	}
 	np := math.Round(math.Pow(sum / float64(cnt), 1.0/4.0)*100) / 100;
@@ -80,18 +70,8 @@ func main() {
 	// (# of seconds of the workout x Normalized Power x Intensity Factor) / (FTP x 3600) x 100
 	tss := (float64(len(w)) * np * intensity / (mult * 3600)) * 100;
 	// Print results
-	fmt.Printf("Name\tTotal (s)\t");
-	zoneNames := []string{};
-	for k := range zones {
-		zoneNames = append(zoneNames, k);
-	}
-	sort.Strings(zoneNames);
-	for _, k := range zoneNames {
-		fmt.Printf("%s\t", k);
-	}
-	fmt.Printf("NP\tIF\tTSS\n");
-	fmt.Printf("<NAME>\t%v\t", len(w))
-	// Calculate Time In Zones
+	body := []string{typ, name, input, fmt.Sprintf("%d", len(w))};
+	body = append(body, fmt.Sprintf("%0.2f", np), fmt.Sprintf("%0.2f", intensity), fmt.Sprintf("%0.2f", tss));
 	timeInZones := map[string]int64{}
 	for k := range zones {
 		timeInZones[k] = 0;
@@ -99,8 +79,52 @@ func main() {
 	for _, v := range w {
 		timeInZones[p.ZoneToName(float64(v.PowerLow + v.PowerHigh) / 2.0)] += 1;
 	}
-	for _, v := range zoneNames {
-		fmt.Printf("%d\t", timeInZones[v]);
+	for _, v := range sortedZoneNames {
+		body = append(body, fmt.Sprintf("%d", timeInZones[v]));
 	}
-	fmt.Printf("%0.2f\t%0.2f\t%0.2f\n", np, intensity, tss)
+	return strings.Join(body, "\t"), nil;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+func main() {
+	flag.Parse()
+	zoneNames := []string{};
+	for k := range zones {
+		zoneNames = append(zoneNames, k);
+	}
+	sort.Strings(zoneNames);
+	hdr := []string{"Type", "Name", "Details", "Total (s)", "NP", "IF", "TSS"}
+	hdr = append(hdr, zoneNames...);
+	fmt.Printf("%s\n", strings.Join(hdr, "\t"));
+	// Read file
+	readFile, err := os.Open(*input)
+	if err != nil {
+		fmt.Printf("Could not read file [%s]: %v\n", *input, err);
+		return;
+	}
+	scanner := bufio.NewScanner(readFile)
+	for scanner.Scan() {
+		line := scanner.Text();
+		data := strings.Split(line, "\t");
+		if len(data) != 3 {
+			fmt.Printf("Could not parse line: [%s]\n", line);
+			return;
+		}
+		mult := ftp
+		tz := zones;
+		if data[0] == "run" {
+			mult = thresholdPace;
+			tz = zonesRun;
+		}
+		body, err := analyzeWorkout(data[0], data[1], data[2], mult, tz, zoneNames);
+		if err != nil {
+			fmt.Printf("%v\n", err);
+			return;
+		}
+		fmt.Printf("%s\n", body);
+	}
+	if err := scanner.Err(); err != nil {
+		fmt.Fprintln(os.Stderr, "reading standard input:", err)
+	}
+	// TODO test a distance workout
 }

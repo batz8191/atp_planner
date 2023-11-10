@@ -195,7 +195,7 @@ func Tokenize(input string) ([]Token, error) {
 			i = end;
 			continue;
 		}
-		return []Token{}, fmt.Errorf("Unknown character: %v\n", c);
+		return []Token{}, fmt.Errorf("Unknown character: %s\n", string(c));
 	}
 	return tokens, nil;
 }
