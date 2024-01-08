@@ -65,7 +65,8 @@ type Distribution struct {
 	Zone5c int
 };
 
-// The distribution expected for each phase
+// The distribution expected for each phase.  Zone1 and Zone2 are
+// combined.
 var distribution = map[string]Distribution{
 	"Base": Distribution{
 		Zone1: 80,
@@ -440,15 +441,18 @@ func main() {
 		fmt.Printf("Week[%d]:\n", i)
 		bestTSS := 0.0;
 		total := time.Duration(0)
+		delta := goal
 		for _, w := range bestWorkouts {
 			star := ""
 			if w.TotalDur > maxNonLongWorkout {
 				star = "*"
 			}
-			fmt.Printf("\t%s%s\t\t%s\t%s\n", star, w.Name, w.TotalDur, w.Zones.String());
+			fmt.Printf("\t%s%s\t%s\t%s\n", star, w.Name, w.TotalDur, w.Zones.String());
 			bestTSS += w.TSS;
 			total += w.TotalDur
+			delta = delta.Sub(w.Zones)
 		}
-		fmt.Printf("total: %s (goal: %s)\ntss: %0.2f (goal: %0.2f)\ndiff: %0.2f\n\n", total, time.Duration(float64(hours)*frac), bestTSS, tss, bestDiff)
+		fmt.Printf("total: %s (goal: %s)\ntss: %0.2f (goal: %0.2f)\ndiff: %0.2f\n", total, time.Duration(float64(hours)*frac), bestTSS, goalTSS, bestDiff)
+		fmt.Printf("Remaining\t%s\nGoal\t%s\n\n", delta, goal)
 	}
 }

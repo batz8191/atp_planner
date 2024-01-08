@@ -33,7 +33,7 @@ type Zone struct {
 type ZoneMap map[string]Zone
 
 type Distance struct {
-	Distance int
+	Distance float64
 	Unit string
 }
 
@@ -204,7 +204,7 @@ func (d *DurationInterval) Window1s(typ IntervalType, p PowerData) []float64 {
 }
 
 type DistanceInterval struct {
-	dist int
+	dist float64
 	unit string
 	pow Power
 }

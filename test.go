@@ -1,7 +1,7 @@
 package main
 
 import (
-	"atp_planner/parser2"
+	"atp_planner/parser"
 	"fmt"
 	"github.com/antlr4-go/antlr/v4"
 	"os"
@@ -32,11 +32,37 @@ func (l *ErrorListener) ReportContextSensitivity(recognizer antlr.Parser, dfa *a
 }
 
 func main() {
-	is := antlr.NewInputStream("5m Z1, 5 * (5m 70%-80%, 3 miles Z1)")
+	//is := antlr.NewInputStream("5m Z1, 5 * (5m 70%-80%, 3 miles 50%)")
+	is := antlr.NewInputStream("5m Z1, 5 * (5m 70%-80%, 3m 50%)")
 	lexer := parser.NewCalcLexer(is)
 	lexer.AddErrorListener(NewErrorListener());
 	stream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	p := parser.NewCalcParser(stream)
 	p.Start_()
 	fmt.Printf("Final: %s\n", parser.Result)
+	z := parser.PowerData{
+		FTP: 352,
+		Zones: parser.ZoneMap{
+			"Z1": parser.Zone{45, 55},     // Active Recovery
+			"Z2": parser.Zone{55, 73},     // Endurance
+			"Z3": parser.Zone{73, 88},     // Tempo
+			"Z4": parser.Zone{88, 104},    // Threshold
+			"Z5a": parser.Zone{104, 119},  // VO2 Max
+			"Z5b": parser.Zone{119, 150},  // Anarobic
+			"Z5c": parser.Zone{150, 200},  // Neuromuscular
+		},
+	}
+	fmt.Printf("Zones:\n")
+	w1s := parser.Result.Window1s(z)
+	cnt := 0
+	v := float64(0)
+	for _, w := range w1s {
+		if w != v {
+			fmt.Printf("%d * %.0f\n", cnt, v)
+			cnt = 0
+			v = w
+		}
+		cnt++
+	}
+	fmt.Printf("%d * %.0f\n", cnt, v)
 }

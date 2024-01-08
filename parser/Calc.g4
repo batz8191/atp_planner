@@ -14,6 +14,14 @@ grammar Calc;
 		}
 		return i
 	}
+	func Atof(location, v string) float64 {
+		i, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			fmt.Printf("Could not parse %s [%s]: %v\n", location, v, err)
+			os.Exit(1)
+		}
+		return i
+	}
 	func ParseDuration(v string) time.Duration {
 		d, err := time.ParseDuration(v)
 		if err != nil {
@@ -84,7 +92,7 @@ atom returns [Interval ret]:
 			}
 		} else if localctx.GetN() != nil {
 			$ret = &DistanceInterval{
-				dist: Atoi("constant", $n.GetText()),
+				dist: float64(Atoi("constant", $n.GetText())),
 				unit: "yards",
 				pow: pow,
 			}
@@ -125,10 +133,12 @@ dur returns [time.Duration ret]:
 		$ret = ParseDuration(localctx.GetText())
 	};
 
+float: NUMBER ('.' NUMBER)?;
+
 dist returns [*Distance ret]:
-	n=NUMBER u=('mile'|'miles'|'yard'|'yards'|'meter'|'meters'|'km') {
+	f=float u=('mile'|'miles'|'yard'|'yards'|'meter'|'meters'|'km') {
 		$ret = &Distance{
-			Distance: Atoi("distance", $n.GetText()),
+			Distance: Atof("distance", localctx.GetF().GetText()),
 			Unit: $u.GetText(),
 		}
 	};

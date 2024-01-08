@@ -13,6 +13,7 @@ import (
 )
 
 var input = flag.String("input", "", "the file to read workouts from")
+var output = flag.String("output", "", "the file to write workouts to")
 
 const ftp = 352.0; // Watts
 var zones = parser.ZoneMap{
@@ -122,18 +123,24 @@ func main() {
 	hdr := []string{"Type", "Name", "Details", "Total (s)", "NP", "IF", "TSS"}
 	hdr = append(hdr, zoneNames...)
 	fmt.Printf("%s\n", strings.Join(hdr, "\t"))
-	// Read file
 	readFile, err := os.Open(*input)
 	if err != nil {
-		fmt.Printf("Could not read file [%s]: %v\n", *input, err)
+		fmt.Fprintf(os.Stderr, "Could not read file [%s]: %v\n", *input, err)
 		return
 	}
+	defer readFile.Close()
+	outFile, err := os.Create(*output)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Could not write file [%s]: %v\n", *output, err)
+		return
+	}
+	defer outFile.Close()
 	scanner := bufio.NewScanner(readFile)
 	for scanner.Scan() {
 		line := scanner.Text()
 		data := strings.Split(line, "\t")
 		if len(data) != 3 {
-			fmt.Printf("Could not parse line: [%s]\n", line)
+			fmt.Fprintf(os.Stderr, "Could not parse line: [%s]\n", line)
 			return
 		}
 		p := parser.PowerData {
@@ -154,10 +161,10 @@ func main() {
 		}
 		body, err := analyzeWorkout(typ, data[1], data[2], p, zoneNames)
 		if err != nil {
-			fmt.Printf("%v\n", err)
+			fmt.Fprintf(outFile, "%v\n", err)
 			return
 		}
-		fmt.Printf("%s\n", body)
+		fmt.Fprintf(outFile, "%s\n", body)
 	}
 	if err := scanner.Err(); err != nil {
 		fmt.Fprintln(os.Stderr, "reading standard input:", err)
